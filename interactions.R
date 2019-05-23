@@ -28,7 +28,12 @@ library(siggenes)
 
 nreps <- 20
 
-computeTestStat <- function(x, nreps, null=FALSE) {
+computeWilcoxon <- function(z, cl) {
+  zzz <- capture.output({w <- rowWilcoxon(z, cl)})
+  w
+}
+
+computeTestStat <- function(x, npseudo, null=FALSE) {
   xa <- x[,group=="A"]
   xb <- x[,group=="B"]
   cond <- condition[group=="A"]
@@ -37,22 +42,36 @@ computeTestStat <- function(x, nreps, null=FALSE) {
     grp <- grp[sample(n/2)] # for permuting across group
   }
   cl <- as.integer(grp) - 1
-  stats <- replicate(nreps, {
+  stats <- replicate(npseudo, {
     # pseudo-pairing
     da <- xa[,shuf(cond=="trt")] - xa[,shuf(cond=="ctr")]
     db <- xb[,shuf(cond=="trt")] - xb[,shuf(cond=="ctr")]
     deltas <- cbind(da, db)
-    zzz <- capture.output({w <- rowWilcoxon(deltas, cl)})
-    w
+    w <- computeWilcoxon(deltas, cl)
   })
   # average over the pseudo-pairing
   rowMeans(stats)
 }
 
-stat <- computeTestStat(x, nreps=20)
+stat <- computeTestStat(x, npseudo=20)
 plot(stat)
 
-nperms <- 20
-nulls <- replicate(nperms, computeTestStat(x, nreps=1, null=TRUE))
-plot(c(stat, as.vector(nulls[,1:5])),
+nperms <- 5 # this is 30 in our method, the higher the better
+nulls <- replicate(nperms, computeTestStat(x, npseudo=1, null=TRUE))
+plot(c(stat, as.vector(nulls)),
      col=rep(c("black","brown"),each=p))
+
+plot(density(stat[(p-pi0*p+1):p]))
+lines(density(nulls), col="brown")
+
+### alternatively, ignore the grouping for permutations
+
+nperms <- 20
+nulls <- replicate(nperms, {
+  computeTestStat(x[,sample(n)], npseudo=20)
+  })
+plot(c(stat, as.vector(nulls)),
+     col=rep(c("black","brown"),each=p))
+
+plot(density(stat[(p-pi0*p+1):p]))
+lines(density(nulls), col="brown")

@@ -53,16 +53,20 @@ computeWilcoxon <- function(z, cl) {
 computeTestStat <- function(x, npseudo, null=FALSE) {
   xa <- x[,group=="A"]
   xb <- x[,group=="B"]
+  # the condition vector for 'xa' or 'xb'
   cond <- condition[group=="A"]
+  # the group vector once we compute pair differences
   grp <- group[condition=="ctr"]
   if (null) {
-    grp <- grp[sample(n/2)] # for permuting across group
+    grp <- grp[sample(n/2)] # for permuting across group variable
   }
+  # siggenes wilcoxon requires binary vector
   cl <- as.integer(grp) - 1
   stats <- replicate(npseudo, {
-    # pseudo-pairing
+    # pseudo-pairing and compute differences
     da <- xa[,shuf(cond=="trt")] - xa[,shuf(cond=="ctr")]
     db <- xb[,shuf(cond=="trt")] - xb[,shuf(cond=="ctr")]
+    # test the differences across grouping variable
     deltas <- cbind(da, db)
     w <- computeWilcoxon(deltas, cl)
   })
@@ -70,25 +74,34 @@ computeTestStat <- function(x, npseudo, null=FALSE) {
   rowMeans(stats)
 }
 
+# this is our observed test statistics
 stat <- computeTestStat(x, npseudo=20)
 plot(stat)
 
-nperms <- 5 # this is 30 in our method, the higher the better
+### 2 ways to approximate the null distribution
+
+# first approach, permute the pairs across group,
+# but always ensure that the pairs are within an original group.
+# perform one pseudo-pairing per permutation
+# (instead of many pseudo-pairings and averaging)
+nperms <- 30
 nulls <- replicate(nperms, computeTestStat(x, npseudo=1, null=TRUE))
-plot(c(stat, as.vector(nulls)),
+plot(c(stat, as.vector(nulls[,1:5])),
      col=rep(c("black","brown"),each=p))
 
+# plot the nulls in the original data and the estimated null distribution
 plot(density(stat[(p-pi0*p+1):p]))
 lines(density(nulls), col="brown")
 
 ### alternatively, ignore the grouping for permutations
 
-nperms <- 20
+nperms <- 30
 nulls <- replicate(nperms, {
   computeTestStat(x[,sample(n)], npseudo=20)
   })
-plot(c(stat, as.vector(nulls)),
+plot(c(stat, as.vector(nulls[,1:5])),
      col=rep(c("black","brown"),each=p))
 
+# plot the nulls in the original data and the estimated null distribution
 plot(density(stat[(p-pi0*p+1):p]))
 lines(density(nulls), col="brown")
